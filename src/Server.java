@@ -247,7 +247,7 @@ public class Server {
 				String message = getMessage(chatMessage);
 				if (message != null) {
 					String[] parts = message.split(":");
-					if (parts.length == 2) {
+					if (parts.length >= 2) {
 						username = URLDecoder.decode(parts[0], "UTF-8");
 						password = URLDecoder.decode(parts[1], "UTF-8");
 
