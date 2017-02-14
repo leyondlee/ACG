@@ -27,6 +27,8 @@ public class Server {
 	private PublicKey publicKey;
 	private PrivateKey privateKey;
 
+	private HashMap<String, String> users;
+
 	/*
 	 *  server constructor that receive the port to listen to for connection as parameter
 	 *  in console
@@ -52,7 +54,9 @@ public class Server {
 		KeyPair keypair = util.generateRSAKeys();
 		this.privateKey = keypair.getPrivate();
 		this.publicKey = keypair.getPublic();
-		
+
+		refreshUserList();
+
 		/* create socket server and wait for connection requests */
 		try {
 			// the socket used by the server
@@ -255,12 +259,11 @@ public class Server {
 							case ChatMessage.LOGIN: {
 								boolean success = false;
 
-								HashMap<String, String> users = getUsers();
 								String value = users.get(username);
 								if (value != null) {
-									String[] passwordparts = value.split(":");
-									byte[] passwordhash = util.hexToBytes(passwordparts[0]);
+									String[] passwordparts = value.split("\\$");
 									byte[] salt = util.hexToBytes(passwordparts[1]);
+									byte[] passwordhash = util.hexToBytes(passwordparts[2]);
 									if (Arrays.equals(Hash.hash(util.stringToBytes(password), salt), passwordhash)) {
 										keepGoing = true;
 										display(username + " just connected.");
@@ -279,14 +282,14 @@ public class Server {
 
 							case ChatMessage.REGISTER: {
 								String confirmpassword = URLDecoder.decode(parts[2], "UTF-8");
-								HashMap<String, String> users = getUsers();
 
 								if (password.equals(confirmpassword) && users.get(username) == null) {
 									byte[] salt = Hash.getSalt();
 									byte[] hash = Hash.hash(util.stringToBytes(password), salt);
 
-									String entry = username + ":" + util.bytesToHex(hash) + ":" + util.bytesToHex(salt);
+									String entry = username + ":$" + util.bytesToHex(salt) + "$" + util.bytesToHex(hash);
 									addUser(entry);
+									refreshUserList();
 
 									writeMsg(ChatMessage.SUCCESS, null);
 								} else {
@@ -465,7 +468,7 @@ public class Server {
 			while ((line = bufferedReader.readLine()) != null) {
 				String parts[] = line.split(":");
 				String username = parts[0];
-				String value = parts[1] + ":" + parts[2];
+				String value = parts[1];
 
 				users.put(username,value);
 			}
@@ -476,5 +479,9 @@ public class Server {
 		}
 
 		return users;
+	}
+
+	private void refreshUserList() {
+		users = getUsers();
 	}
 }

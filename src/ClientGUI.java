@@ -30,54 +30,8 @@ public class ClientGUI extends JFrame implements ActionListener {
 
 	private JPanel northPanel;
 
-	ClientGUI() {
+	public ClientGUI() {
 		mainDialog();
-	}
-
-	// Constructor connection receiving a socket number
-	ClientGUI(Client client) {
-		super("Chat Client");
-
-		this.client = client;
-		this.connected = true;
-
-		// The NorthPanel with:
-		northPanel = new JPanel(new GridLayout(2,1));
-
-		// the Label and the TextField
-		label = new JLabel("Enter your message below", SwingConstants.CENTER);
-		northPanel.add(label);
-		tf = new JTextField();
-		tf.setBackground(Color.WHITE);
-		northPanel.add(tf);
-		add(northPanel, BorderLayout.NORTH);
-
-		// The CenterPanel which is the chat room
-		ta = new JTextArea("Welcome to the Chat room\n", 80, 80);
-		JPanel centerPanel = new JPanel(new GridLayout(1,1));
-		centerPanel.add(new JScrollPane(ta));
-		ta.setEditable(false);
-		add(centerPanel, BorderLayout.CENTER);
-
-		// the 3 buttons
-		logout = new JButton("Logout");
-		logout.addActionListener(this);
-		//logout.setEnabled(false);		// you have to login before being able to logout
-		whoIsIn = new JButton("Who is in");
-		whoIsIn.addActionListener(this);
-		//whoIsIn.setEnabled(false);		// you have to login before being able to Who is in
-		tf.addActionListener(this);
-
-		JPanel southPanel = new JPanel();
-		southPanel.add(logout);
-		southPanel.add(whoIsIn);
-		add(southPanel, BorderLayout.SOUTH);
-
-		setDefaultCloseOperation(EXIT_ON_CLOSE);
-		setSize(600, 600);
-		setVisible(true);
-		tf.requestFocus();
-		setLocationRelativeTo(null);
 	}
 
 	// called by the Client to append text in the TextArea
@@ -103,11 +57,11 @@ public class ClientGUI extends JFrame implements ActionListener {
 	*/
 	public void actionPerformed(ActionEvent e) {
 		Object o = e.getSource();
+
 		// if it is the Logout button
-		if(o == logout) {
+		if (o == logout) {
+			mainDialog();
 			client.sendMessage(ChatMessage.LOGOUT, null);
-			dispose();
-			new ClientGUI();
 			return;
 		}
 
@@ -134,6 +88,8 @@ public class ClientGUI extends JFrame implements ActionListener {
 	}
 
 	public void mainDialog() {
+		this.connected = false;
+
 		getContentPane().removeAll();
 		setTitle("");
 
@@ -248,10 +204,14 @@ public class ClientGUI extends JFrame implements ActionListener {
 					String username = usernameField.getText();
 					String password = new String(passwordField.getPassword());
 
-					Client client = new Client(host, port, ClientGUI.this);
-					if (!client.start(username, password)) {
-						JOptionPane.showMessageDialog(getContentPane(),"Error: Unable to connect to server",getTitle(),JOptionPane.ERROR_MESSAGE);
-					};
+					if (!username.equals("") && !password.equals("")) {
+						Client client = new Client(host, port, ClientGUI.this);
+						if (!client.start(username, password)) {
+							JOptionPane.showMessageDialog(getContentPane(), "Unable to connect to server", getTitle(), JOptionPane.ERROR_MESSAGE);
+						}
+					} else {
+						JOptionPane.showMessageDialog(getContentPane(), "You must enter both username and password", getTitle(), JOptionPane.ERROR_MESSAGE);
+					}
 				}
 			});
 		} else {
@@ -274,10 +234,14 @@ public class ClientGUI extends JFrame implements ActionListener {
 					String password = new String(passwordField.getPassword());
 					String confirmpassword = new String(confirmPasswordField.getPassword());
 
-					Client client = new Client(host, port, ClientGUI.this);
-					if (!client.start(username, password, confirmpassword)) {
-						JOptionPane.showMessageDialog(getContentPane(),"Error: Unable to connect to server",getTitle(),JOptionPane.ERROR_MESSAGE);
-					};
+					if (!username.equals("") && !password.equals("") && !confirmpassword.equals("")) {
+						Client client = new Client(host, port, ClientGUI.this);
+						if (!client.start(username, password, confirmpassword)) {
+							JOptionPane.showMessageDialog(getContentPane(), "Unable to connect to server", getTitle(), JOptionPane.ERROR_MESSAGE);
+						}
+					} else {
+						JOptionPane.showMessageDialog(getContentPane(), "You must fill in all fields", getTitle(), JOptionPane.ERROR_MESSAGE);
+					}
 				}
 			});
 		}
@@ -297,6 +261,53 @@ public class ClientGUI extends JFrame implements ActionListener {
 		setSize(350, 200);
 		setLocationRelativeTo(null);
 		setVisible(true);
+		usernameField.requestFocusInWindow();
+		getRootPane().setDefaultButton(jButton);
+	}
+
+	public void chatDialog() {
+		this.connected = true;
+
+		getContentPane().removeAll();
+		setTitle("Chat Client");
+
+		// The NorthPanel with:
+		northPanel = new JPanel(new GridLayout(2,1));
+
+		// the Label and the TextField
+		label = new JLabel("Enter your message below", SwingConstants.CENTER);
+		northPanel.add(label);
+		tf = new JTextField();
+		tf.setBackground(Color.WHITE);
+		northPanel.add(tf);
+		add(northPanel, BorderLayout.NORTH);
+
+		// The CenterPanel which is the chat room
+		ta = new JTextArea("Welcome to the Chat room\n", 80, 80);
+		JPanel centerPanel = new JPanel(new GridLayout(1,1));
+		centerPanel.add(new JScrollPane(ta));
+		ta.setEditable(false);
+		add(centerPanel, BorderLayout.CENTER);
+
+		// the 3 buttons
+		logout = new JButton("Logout");
+		logout.addActionListener(this);
+		//logout.setEnabled(false);		// you have to login before being able to logout
+		whoIsIn = new JButton("Who is in");
+		whoIsIn.addActionListener(this);
+		//whoIsIn.setEnabled(false);		// you have to login before being able to Who is in
+		tf.addActionListener(this);
+
+		JPanel southPanel = new JPanel();
+		southPanel.add(logout);
+		southPanel.add(whoIsIn);
+		add(southPanel, BorderLayout.SOUTH);
+
+		setDefaultCloseOperation(EXIT_ON_CLOSE);
+		setSize(600, 600);
+		setVisible(true);
+		tf.requestFocus();
+		setLocationRelativeTo(null);
 	}
 
 	private void setConstraints(GridBagConstraints gridBagConstraints, int gridx, int gridy, int fill, double weightx, int anchor) {
@@ -305,5 +316,13 @@ public class ClientGUI extends JFrame implements ActionListener {
 		gridBagConstraints.fill = fill;
 		gridBagConstraints.weightx = weightx;
 		gridBagConstraints.anchor = anchor;
+	}
+
+	public boolean isConnected() {
+		return connected;
+	}
+
+	public void setClient(Client client) {
+		this.client = client;
 	}
 }

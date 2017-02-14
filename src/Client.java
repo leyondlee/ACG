@@ -104,7 +104,7 @@ public class Client  {
 				switch (chatMessage.getType()) {
 					case ChatMessage.SUCCESS: {
 						if (cg != null) {
-							JOptionPane.showMessageDialog(cg,"Registration successful",cg.getTitle(),JOptionPane.INFORMATION_MESSAGE);
+							JOptionPane.showMessageDialog(cg,"Registration Successful",cg.getTitle(),JOptionPane.INFORMATION_MESSAGE);
 							cg.mainDialog();
 						}
 
@@ -113,7 +113,7 @@ public class Client  {
 
 					case ChatMessage.FAIL: {
 						if (cg != null) {
-							JOptionPane.showMessageDialog(cg, "Error: Registration fail", cg.getTitle(), JOptionPane.ERROR_MESSAGE);
+							JOptionPane.showMessageDialog(cg, "Registration Fail. Username already exists or passwords do not match.", cg.getTitle(), JOptionPane.ERROR_MESSAGE);
 						}
 
 						break;
@@ -128,8 +128,9 @@ public class Client  {
 						String msg = "Connection accepted " + socket.getInetAddress() + ":" + socket.getPort();
 
 						if (cg != null) {
+							cg.setClient(this);
 							cg.setVisible(false);
-							cg = new ClientGUI(this);
+							cg.chatDialog();
 						}
 
 						display(msg);
@@ -142,7 +143,7 @@ public class Client  {
 
 					case ChatMessage.FAIL: {
 						if (cg != null) {
-							JOptionPane.showMessageDialog(cg, "Error: Login fail", cg.getTitle(), JOptionPane.ERROR_MESSAGE);
+							JOptionPane.showMessageDialog(cg, "Login Fail", cg.getTitle(), JOptionPane.ERROR_MESSAGE);
 						}
 
 						break;
@@ -207,19 +208,19 @@ public class Client  {
 	private void disconnect() {
 		try {
 			if(sInput != null) sInput.close();
-		} catch(Exception e) {
+		} catch (Exception e) {
 
 		} // not much else I can do
 
 		try {
 			if(sOutput != null) sOutput.close();
-		} catch(Exception e) {
+		} catch (Exception e) {
 
 		} // not much else I can do
 
         try{
 			if(socket != null) socket.close();
-		} catch(Exception e) {
+		} catch (Exception e) {
 
 		} // not much else I can do
 
@@ -284,7 +285,7 @@ public class Client  {
 		Client client = new Client(serverAddress, portNumber);
 		// test if we can start the connection to the Server
 		// if it failed nothing we can do
-		if(!client.start(username,password))
+		if (!client.start(username,password))
 			return;
 
 		// wait for messages from user
@@ -299,7 +300,7 @@ public class Client  {
 				client.sendMessage(ChatMessage.LOGOUT, null);
 				// break to do the disconnect
 				break;
-			} else if(msg.equalsIgnoreCase("WHOISIN")) {
+			} else if (msg.equalsIgnoreCase("WHOISIN")) {
 				// message WhoIsIn
 				client.sendMessage(ChatMessage.WHOISIN, null);
 			} else {
@@ -337,24 +338,15 @@ public class Client  {
 						}
 
 						default: {
-							byte[] encryptedMessage = chatMessage.getMessage();
-							byte[] encryptedIV = chatMessage.getEncryptedIV();
-							IvParameterSpec IV = new IvParameterSpec(util.decryptIV(encryptedIV,privateKey));
-							byte[] digitalSignature = chatMessage.getDigitalSignature();
-							byte[] salt = chatMessage.getSalt();
+							String message = getMessage(chatMessage);
 
-							byte[] messageBytes = util.decrypt("AES/CBC/PKCS5Padding",AESKey,encryptedMessage,IV);
-							byte[] hash = util.decrypt("RSA/ECB/PKCS1Padding",publicKeyServer,digitalSignature,null);
-
-							if (Arrays.equals(hash, Hash.hash(messageBytes, salt))) {
-								String msg = util.bytesToString(messageBytes);
-
+							if (message != null) {
 								// if console mode print the message and add back the prompt
 								if (cg == null) {
-									System.out.println(msg);
+									System.out.println(message);
 									System.out.print("> ");
 								} else {
-									cg.append(msg);
+									cg.append(message);
 								}
 							}
 
@@ -363,17 +355,35 @@ public class Client  {
 					}
 				} catch (IOException e) {
 					display("Server has close the connection: " + e);
-					if(cg != null) {
+					if (cg != null && cg.isConnected()) {
 						cg.connectionFailed();
-						cg.dispose();
-						cg = new ClientGUI();
+						cg.mainDialog();
 					}
 
 					break;
-				} catch(ClassNotFoundException e) {
+				} catch (ClassNotFoundException e) {
 					// can't happen with a String object but need the catch anyhow
 				}
 			}
+		}
+
+		private String getMessage(ChatMessage chatMessage) {
+			String message = null;
+
+			byte[] encryptedMessage = chatMessage.getMessage();
+			byte[] encryptedIV = chatMessage.getEncryptedIV();
+			IvParameterSpec IV = new IvParameterSpec(util.decryptIV(encryptedIV,privateKey));
+			byte[] digitalSignature = chatMessage.getDigitalSignature();
+			byte[] salt = chatMessage.getSalt();
+
+			byte[] messageBytes = util.decrypt("AES/CBC/PKCS5Padding",AESKey,encryptedMessage,IV);
+			byte[] hash = util.decrypt("RSA/ECB/PKCS1Padding",publicKeyServer,digitalSignature,null);
+
+			if (Arrays.equals(hash, Hash.hash(messageBytes, salt))) {
+				message = util.bytesToString(messageBytes);
+			}
+
+			return message;
 		}
 	}
 }
