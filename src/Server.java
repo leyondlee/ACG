@@ -341,7 +341,7 @@ public class Server {
 				switch (cm.getType()) {
 					case ChatMessage.MESSAGE: {
 						if (message != null) {
-							Pattern pattern = Pattern.compile("^\\@(.*)\\s(.*)$");
+							Pattern pattern = Pattern.compile("^\\@(\\S+)\\s(.*)");
 							Matcher matcher = pattern.matcher(message);
 							if (matcher.find()) {
 								String user = matcher.group(1);

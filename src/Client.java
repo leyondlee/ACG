@@ -95,6 +95,8 @@ public class Client  {
 			username = URLEncoder.encode(username,"UTF-8");
 			password = URLEncoder.encode(password,"UTF-8");
 			String message = username + ":" + password;
+
+			String msg;
 			if (confirmpassword != null) {
 				confirmpassword = URLEncoder.encode(confirmpassword,"UTF-8");
 				message += ":" + confirmpassword;
@@ -103,17 +105,23 @@ public class Client  {
 				ChatMessage chatMessage = (ChatMessage) sInput.readObject();
 				switch (chatMessage.getType()) {
 					case ChatMessage.SUCCESS: {
+						msg = "Registration Successful";
 						if (cg != null) {
-							JOptionPane.showMessageDialog(cg,"Registration Successful",cg.getTitle(),JOptionPane.INFORMATION_MESSAGE);
+							JOptionPane.showMessageDialog(cg,msg,cg.getTitle(),JOptionPane.INFORMATION_MESSAGE);
 							cg.mainDialog();
+						} else {
+							display("Registration Successful");
 						}
 
 						break;
 					}
 
 					case ChatMessage.FAIL: {
+						msg = "Registration Fail. Username already exists / contains whitespaces or passwords do not match.";
 						if (cg != null) {
-							JOptionPane.showMessageDialog(cg, "Registration Fail. Username already exists / contains whitespaces or passwords do not match.", cg.getTitle(), JOptionPane.ERROR_MESSAGE);
+							JOptionPane.showMessageDialog(cg, msg, cg.getTitle(), JOptionPane.ERROR_MESSAGE);
+						} else {
+							display("Registration Successful");
 						}
 
 						break;
@@ -125,7 +133,7 @@ public class Client  {
 				ChatMessage chatMessage = (ChatMessage) sInput.readObject();
 				switch (chatMessage.getType()) {
 					case ChatMessage.SUCCESS: {
-						String msg = "Connection accepted " + socket.getInetAddress() + ":" + socket.getPort();
+						msg = "Connection accepted " + socket.getInetAddress() + ":" + socket.getPort();
 
 						if (cg != null) {
 							cg.setClient(this);
@@ -142,8 +150,11 @@ public class Client  {
 					}
 
 					case ChatMessage.FAIL: {
+						msg = "Login Fail";
 						if (cg != null) {
-							JOptionPane.showMessageDialog(cg, "Login Fail", cg.getTitle(), JOptionPane.ERROR_MESSAGE);
+							JOptionPane.showMessageDialog(cg, msg, cg.getTitle(), JOptionPane.ERROR_MESSAGE);
+						} else {
+							display(msg);
 						}
 
 						break;
