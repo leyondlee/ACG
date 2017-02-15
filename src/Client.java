@@ -113,7 +113,7 @@ public class Client  {
 
 					case ChatMessage.FAIL: {
 						if (cg != null) {
-							JOptionPane.showMessageDialog(cg, "Registration Fail. Username already exists or passwords do not match.", cg.getTitle(), JOptionPane.ERROR_MESSAGE);
+							JOptionPane.showMessageDialog(cg, "Registration Fail. Username already exists / contains whitespaces or passwords do not match.", cg.getTitle(), JOptionPane.ERROR_MESSAGE);
 						}
 
 						break;
@@ -255,7 +255,7 @@ public class Client  {
 		String password = "";
 
 		// depending of the number of arguments provided we fall through
-		switch(args.length) {
+		switch (args.length) {
 			// > javac Client username portNumber serverAddr
 			case 4:
 				serverAddress = args[3];
@@ -330,8 +330,10 @@ public class Client  {
 					ChatMessage chatMessage = (ChatMessage) sInput.readObject();
 					switch (chatMessage.getType()) {
 						case ChatMessage.SHUTDOWN: {
+							String msg = "Server is shutting down";
+							display(msg);
 							if (cg != null) {
-								JOptionPane.showMessageDialog(cg,"Server has close the connection",cg.getTitle(),JOptionPane.WARNING_MESSAGE);
+								JOptionPane.showMessageDialog(cg,msg,cg.getTitle(),JOptionPane.WARNING_MESSAGE);
 							}
 
 							break;

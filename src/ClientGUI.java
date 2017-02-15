@@ -259,7 +259,6 @@ public class ClientGUI extends JFrame implements ActionListener {
 		add(mainPanel,BorderLayout.CENTER);
 		add(buttonPanel,BorderLayout.SOUTH);
 		setSize(350, 200);
-		setLocationRelativeTo(null);
 		setVisible(true);
 		usernameField.requestFocusInWindow();
 		getRootPane().setDefaultButton(jButton);
@@ -305,9 +304,9 @@ public class ClientGUI extends JFrame implements ActionListener {
 
 		setDefaultCloseOperation(EXIT_ON_CLOSE);
 		setSize(600, 600);
+		setLocationRelativeTo(null);
 		setVisible(true);
 		tf.requestFocus();
-		setLocationRelativeTo(null);
 	}
 
 	private void setConstraints(GridBagConstraints gridBagConstraints, int gridx, int gridy, int fill, double weightx, int anchor) {

@@ -3,6 +3,8 @@ import java.net.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.security.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.crypto.*;
 import javax.crypto.spec.*;
@@ -141,10 +143,11 @@ public class Server {
 		String time = sdf.format(new Date());
 		String messageLf = time + " " + message + "\n";
 		// display message on console or GUI
-		if(sg == null)
+		if (sg == null) {
 			System.out.print(messageLf);
-		else
+		} else {
 			sg.appendRoom(messageLf);     // append in the room window
+		}
 
 		// we loop in reverse order in case we would have to remove a Client
 		// because it has disconnected
@@ -164,7 +167,7 @@ public class Server {
 		for(int i = 0; i < al.size(); ++i) {
 			ClientThread ct = al.get(i);
 			// found it
-			if(ct.id == id) {
+			if (ct.id == id) {
 				al.remove(i);
 				return;
 			}
@@ -261,13 +264,17 @@ public class Server {
 
 								String value = users.get(username);
 								if (value != null) {
-									String[] passwordparts = value.split("\\$");
-									byte[] salt = util.hexToBytes(passwordparts[1]);
-									byte[] passwordhash = util.hexToBytes(passwordparts[2]);
-									if (Arrays.equals(Hash.hash(util.stringToBytes(password), salt), passwordhash)) {
-										keepGoing = true;
-										display(username + " just connected.");
-										success = true;
+									Pattern pattern = Pattern.compile("^\\$(.*)\\$(.*)$");
+									Matcher matcher = pattern.matcher(value);
+
+									if (matcher.find()) {
+										byte[] salt = util.hexToBytes(matcher.group(1));
+										byte[] passwordhash = util.hexToBytes(matcher.group(2));
+										if (Arrays.equals(Hash.hash(util.stringToBytes(password), salt), passwordhash)) {
+											keepGoing = true;
+											display(username + " just connected.");
+											success = true;
+										}
 									}
 								}
 
@@ -283,7 +290,7 @@ public class Server {
 							case ChatMessage.REGISTER: {
 								String confirmpassword = URLDecoder.decode(parts[2], "UTF-8");
 
-								if (password.equals(confirmpassword) && users.get(username) == null) {
+								if (!username.contains(" ") && password.equals(confirmpassword) && users.get(username) == null) {
 									byte[] salt = Hash.getSalt();
 									byte[] hash = Hash.hash(util.stringToBytes(password), salt);
 
@@ -334,7 +341,24 @@ public class Server {
 				switch (cm.getType()) {
 					case ChatMessage.MESSAGE: {
 						if (message != null) {
-							broadcast(username + ": " + message);
+							Pattern pattern = Pattern.compile("^\\@(.*)\\s(.*)$");
+							Matcher matcher = pattern.matcher(message);
+							if (matcher.find()) {
+								String user = matcher.group(1);
+								message = matcher.group(2);
+								if (!username.equals(user)) {
+									ClientThread receiverCT = findClientThread(user);
+									if (receiverCT != null) {
+										privateMessage(this, receiverCT, message);
+									} else {
+										writeMsg(ChatMessage.NONE,"User " + user + " is not online.\n");
+									}
+								} else {
+									writeMsg(ChatMessage.NONE,"You cannot private message yourself.\n");
+								}
+							} else {
+								broadcast(username + ": " + message);
+							}
 						}
 						break;
 					}
@@ -366,19 +390,25 @@ public class Server {
 		private void close() {
 			// try to close the connection
 			try {
-				if(sOutput != null) sOutput.close();
+				if (sOutput != null) {
+					sOutput.close();
+				}
 			} catch(Exception e) {
 
 			}
 
 			try {
-				if(sInput != null) sInput.close();
+				if (sInput != null) {
+					sInput.close();
+				}
 			} catch(Exception e) {
 
 			};
 
 			try {
-				if(socket != null) socket.close();
+				if (socket != null) {
+					socket.close();
+				}
 			} catch (Exception e) {
 
 			};
@@ -483,5 +513,41 @@ public class Server {
 
 	private void refreshUserList() {
 		users = getUsers();
+	}
+
+	private synchronized void privateMessage(ClientThread senderCT, ClientThread receiverCT, String message) {
+		String sender = senderCT.username;
+		String receiver = receiverCT.username;
+
+		// add HH:mm:ss and \n to the message
+		String time = sdf.format(new Date());
+		String messageLf = time + " " + sender + " -> " + receiver + ": " + message + "\n";
+		// display message on console or GUI
+		if (sg == null) {
+			System.out.print(messageLf);
+		} else {
+			sg.appendRoom(messageLf);     // append in the room window
+		}
+
+		messageLf = time + " " + sender + " -> You: " + message + "\n";
+		receiverCT.writeMsg(ChatMessage.NONE, messageLf);
+
+		messageLf = time + " You -> " + receiver + ": " + message + "\n";
+		senderCT.writeMsg(ChatMessage.NONE, messageLf);
+	}
+
+	private ClientThread findClientThread(String username) {
+		ClientThread clientThread = null;
+
+		for (int i = 0; i < al.size(); i++) {
+			ClientThread ct = al.get(i);
+
+			if (ct.username.equals(username)) {
+				clientThread = ct;
+				break;
+			}
+		}
+
+		return clientThread;
 	}
 }
