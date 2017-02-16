@@ -64,7 +64,7 @@ public class Client  {
 	}
 
 	public boolean start(String username, String password, String confirmpassword) {
-		KeyPair keypair = util.generateRSAKeys();
+		KeyPair keypair = Util.generateRSAKeys();
 		this.privateKey = keypair.getPrivate();
 		this.publicKey = keypair.getPublic();
 
@@ -114,7 +114,7 @@ public class Client  {
 			try {
 				sOutput.writeObject(publicKey);
 
-				byte[] decryptedKey = util.decrypt("RSA/ECB/PKCS1Padding", privateKey, (byte[]) sInput.readObject(), null);
+				byte[] decryptedKey = Util.decrypt("RSA/ECB/PKCS1Padding", privateKey, (byte[]) sInput.readObject(), null);
 				AESKey = new SecretKeySpec(decryptedKey, "AES");
 
 				username = URLEncoder.encode(username, "UTF-8");
@@ -218,18 +218,18 @@ public class Client  {
 			ChatMessage chatMessage = new ChatMessage();
 			chatMessage.setType(type);
 			if (message != null) {
-				byte[] messageBytes = util.stringToBytes(message);
+				byte[] messageBytes = Util.stringToBytes(message);
 
-				IvParameterSpec IV = util.generateIV();
-				byte[] encryptedIV = util.encryptIV(IV.getIV(),publicKeyServer);
+				IvParameterSpec IV = Util.generateIV();
+				byte[] encryptedIV = Util.encryptIV(IV.getIV(),publicKeyServer);
 				chatMessage.setEncryptedIV(encryptedIV);
 
-				byte[] cipherText = util.encrypt("AES/CBC/PKCS5Padding",AESKey,messageBytes,IV);
+				byte[] cipherText = Util.encrypt("AES/CBC/PKCS5Padding",AESKey,messageBytes,IV);
 				chatMessage.setMessage(cipherText);
 
 				byte[] salt = Hash.getSalt();
 				byte[] hash = Hash.hash(message, salt);
-				byte[] digitalSignature = util.encrypt("RSA/ECB/PKCS1Padding",privateKey,hash,null);
+				byte[] digitalSignature = Util.encrypt("RSA/ECB/PKCS1Padding",privateKey,hash,null);
 				chatMessage.setDigitalSignature(digitalSignature);
 				chatMessage.setSalt(salt);
 			}
@@ -419,14 +419,14 @@ public class Client  {
 
 			byte[] encryptedMessage = chatMessage.getMessage();
 			byte[] encryptedIV = chatMessage.getEncryptedIV();
-			IvParameterSpec IV = new IvParameterSpec(util.decryptIV(encryptedIV,privateKey));
+			IvParameterSpec IV = new IvParameterSpec(Util.decryptIV(encryptedIV,privateKey));
 			byte[] digitalSignature = chatMessage.getDigitalSignature();
 			byte[] salt = chatMessage.getSalt();
 
-			byte[] messageBytes = util.decrypt("AES/CBC/PKCS5Padding",AESKey,encryptedMessage,IV);
-			byte[] hash = util.decrypt("RSA/ECB/PKCS1Padding",publicKeyServer,digitalSignature,null);
+			byte[] messageBytes = Util.decrypt("AES/CBC/PKCS5Padding",AESKey,encryptedMessage,IV);
+			byte[] hash = Util.decrypt("RSA/ECB/PKCS1Padding",publicKeyServer,digitalSignature,null);
 
-			message = util.bytesToString(messageBytes);
+			message = Util.bytesToString(messageBytes);
 			if (!Arrays.equals(hash, Hash.hash(message, salt))) {
 				message = null;
 			}

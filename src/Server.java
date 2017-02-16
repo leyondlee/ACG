@@ -77,7 +77,7 @@ public class Server {
 				// if I was asked to stop
 				if(!keepGoing)
 					break;
-				ClientThread t = new ClientThread(socket,publicKey,util.generateAESKey());  // make a thread of it
+				ClientThread t = new ClientThread(socket,publicKey,Util.generateAESKey());  // make a thread of it
 				al.add(t);									// save it in the ArrayList
 				t.start();
 			}
@@ -253,7 +253,7 @@ public class Server {
 				sOutput.writeObject(certificate);
 
 				publicKey = (PublicKey) sInput.readObject();
-				sOutput.writeObject(util.encrypt("RSA/ECB/PKCS1Padding",publicKey,AESKey.getEncoded(),null));
+				sOutput.writeObject(Util.encrypt("RSA/ECB/PKCS1Padding",publicKey,AESKey.getEncoded(),null));
 
 				ChatMessage chatMessage = (ChatMessage) sInput.readObject();
 				String message = getMessage(chatMessage);
@@ -273,8 +273,8 @@ public class Server {
 									Matcher matcher = pattern.matcher(value);
 
 									if (matcher.find()) {
-										byte[] salt = util.hexToBytes(matcher.group(1));
-										byte[] passwordhash = util.hexToBytes(matcher.group(2));
+										byte[] salt = Util.hexToBytes(matcher.group(1));
+										byte[] passwordhash = Util.hexToBytes(matcher.group(2));
 										if (Arrays.equals(Hash.hash(password, salt), passwordhash)) {
 											keepGoing = true;
 											display(username + " just connected.");
@@ -299,7 +299,7 @@ public class Server {
 									byte[] salt = Hash.getSalt();
 									byte[] hash = Hash.hash(password, salt);
 
-									String entry = username + ":$" + util.bytesToHex(salt) + "$" + util.bytesToHex(hash);
+									String entry = username + ":$" + Util.bytesToHex(salt) + "$" + Util.bytesToHex(hash);
 									addUser(entry);
 									refreshUserList();
 
@@ -335,7 +335,7 @@ public class Server {
 						display(username + " Exception reading Streams: " + e);
 					}
 					break;
-				} catch(ClassNotFoundException e2) {
+				} catch (ClassNotFoundException e2) {
 					break;
 				}
 				
@@ -433,15 +433,15 @@ public class Server {
 			try {
 				ChatMessage chatMessage;
 				if (msg != null) {
-					byte[] messageBytes = util.stringToBytes(msg);
+					byte[] messageBytes = Util.stringToBytes(msg);
 
 					byte[] salt = Hash.getSalt();
 					byte[] hash = Hash.hash(msg, salt);
-					byte[] digitalSignature = util.encrypt("RSA/ECB/PKCS1Padding", privateKey, hash, null);
+					byte[] digitalSignature = Util.encrypt("RSA/ECB/PKCS1Padding", privateKey, hash, null);
 
-					IvParameterSpec IV = util.generateIV();
-					byte[] encryptedIV = util.encryptIV(IV.getIV(), publicKey);
-					byte[] encryptedMessage = util.encrypt("AES/CBC/PKCS5Padding", AESKey, messageBytes, IV);
+					IvParameterSpec IV = Util.generateIV();
+					byte[] encryptedIV = Util.encryptIV(IV.getIV(), publicKey);
+					byte[] encryptedMessage = Util.encrypt("AES/CBC/PKCS5Padding", AESKey, messageBytes, IV);
 
 					chatMessage = new ChatMessage(type, encryptedMessage, encryptedIV, digitalSignature, salt);
 				} else {
@@ -465,14 +465,14 @@ public class Server {
 			if (messageBytes != null) {
 				byte[] digitalSignature = chatMessage.getDigitalSignature();
 				byte[] salt = chatMessage.getSalt();
-				byte[] hash = util.decrypt("RSA/ECB/PKCS1Padding",publicKey,digitalSignature,null);
+				byte[] hash = Util.decrypt("RSA/ECB/PKCS1Padding",publicKey,digitalSignature,null);
 				try {
 					byte[] encryptedIV = chatMessage.getEncryptedIV();
-					IvParameterSpec IV = new IvParameterSpec(util.decryptIV(encryptedIV,privateKey));
-					byte[] decryptedText = util.decrypt("AES/CBC/PKCS5Padding",AESKey,messageBytes,IV);
+					IvParameterSpec IV = new IvParameterSpec(Util.decryptIV(encryptedIV,privateKey));
+					byte[] decryptedText = Util.decrypt("AES/CBC/PKCS5Padding",AESKey,messageBytes,IV);
 
-					if (Arrays.equals(hash, Hash.hash(util.bytesToString(decryptedText), salt))) {
-						message = util.bytesToString(decryptedText);
+					if (Arrays.equals(hash, Hash.hash(Util.bytesToString(decryptedText), salt))) {
+						message = Util.bytesToString(decryptedText);
 					}
 				} catch (Exception e) {
 					//e.printStackTrace();
