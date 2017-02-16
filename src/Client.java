@@ -1,9 +1,10 @@
 
 import java.net.*;
 import java.io.*;
+import java.security.cert.X509Certificate;
 import java.util.*;
 import java.security.*;
-import java.security.spec.*;
+import java.security.cert.Certificate;
 
 import javax.crypto.*;
 import javax.crypto.spec.*;
@@ -13,6 +14,8 @@ import javax.swing.*;
  * The Client that can be run both as a console or a GUI
  */
 public class Client  {
+	private static final String TRUSTSTOREFILE = "truststore";
+	private static final String TRUSTSTOREPASSWORD = "password";
 
 	// for I/O
 	private ObjectInputStream sInput;		// to read from the socket
@@ -71,100 +74,125 @@ public class Client  {
 			return false;
 		}
 
+		boolean verified;
 		/* Creating both Data Stream */
 		try {
 			sInput  = new ObjectInputStream(socket.getInputStream());
 			sOutput = new ObjectOutputStream(socket.getOutputStream());
-			
-			byte[] b = (byte[]) sInput.readObject();
-			PublicKey pk = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(b));
-			this.publicKeyServer = pk;
+
+			Certificate certificate = (Certificate) sInput.readObject();
+			PublicKey publicKey = certificate.getPublicKey();
+			this.publicKeyServer = publicKey;
+			verified = verifyCertificate(certificate);
 		} catch (Exception e) {
 			display("Exception creating new Input/output Streams: " + e);
 			return false;
 		}
-		
-		// Send our username to the server this is the only message that we
-		// will send as a String. All other messages will be ChatMessage objects
-		try {
-			sOutput.writeObject(publicKey);
-			
-			byte[] decryptedKey = util.decrypt("RSA/ECB/PKCS1Padding",privateKey,(byte[]) sInput.readObject(),null);
-			AESKey = new SecretKeySpec(decryptedKey,"AES");
 
-			username = URLEncoder.encode(username,"UTF-8");
-			password = URLEncoder.encode(password,"UTF-8");
-			String message = username + ":" + password;
-
-			String msg;
-			if (confirmpassword != null) {
-				confirmpassword = URLEncoder.encode(confirmpassword,"UTF-8");
-				message += ":" + confirmpassword;
-
-				sendMessage(ChatMessage.REGISTER,message);
-				ChatMessage chatMessage = (ChatMessage) sInput.readObject();
-				switch (chatMessage.getType()) {
-					case ChatMessage.SUCCESS: {
-						msg = "Registration Successful";
-						if (cg != null) {
-							JOptionPane.showMessageDialog(cg,msg,cg.getTitle(),JOptionPane.INFORMATION_MESSAGE);
-							cg.mainDialog();
-						} else {
-							display("Registration Successful");
-						}
-
-						break;
-					}
-
-					case ChatMessage.FAIL: {
-						msg = "Registration Fail. Username already exists / contains whitespaces or passwords do not match.";
-						if (cg != null) {
-							JOptionPane.showMessageDialog(cg, msg, cg.getTitle(), JOptionPane.ERROR_MESSAGE);
-						} else {
-							display("Registration Successful");
-						}
-
-						break;
-					}
+		boolean keepconnection = true;
+		if (!verified) {
+			String msg = "Certificate is not trusted. your session may not be secure. Do you wish to continue?";
+			if (cg != null) {
+				String options[] = {"Yes","No (Recommended)"};
+				int option = JOptionPane.showOptionDialog(cg, msg,cg.getTitle(),JOptionPane.YES_NO_OPTION,JOptionPane.WARNING_MESSAGE,null,options,options[1]);
+				if (option == JOptionPane.NO_OPTION || option == JOptionPane.CLOSED_OPTION) {
+					keepconnection = false;
 				}
 			} else {
-				sendMessage(ChatMessage.LOGIN,message);
-
-				ChatMessage chatMessage = (ChatMessage) sInput.readObject();
-				switch (chatMessage.getType()) {
-					case ChatMessage.SUCCESS: {
-						msg = "Connection accepted " + socket.getInetAddress() + ":" + socket.getPort();
-
-						if (cg != null) {
-							cg.setClient(this);
-							cg.setVisible(false);
-							cg.chatDialog();
-						}
-
-						display(msg);
-
-						// creates the Thread to listen from the server
-						new ListenFromServer(AESKey).start();
-
-						break;
-					}
-
-					case ChatMessage.FAIL: {
-						msg = "Login Fail";
-						if (cg != null) {
-							JOptionPane.showMessageDialog(cg, msg, cg.getTitle(), JOptionPane.ERROR_MESSAGE);
-						} else {
-							display(msg);
-						}
-
-						break;
-					}
+				Scanner scanner = new Scanner(System.in);
+				System.out.print("WARNING - " + msg + "[Y]es, [N]o (Recommended) => ");
+				String input = scanner.next();
+				if (input.equalsIgnoreCase("N")) {
+					keepconnection = false;
 				}
 			}
-		} catch (Exception e) {
-			//display("Exception doing login : " + e);
+		}
+
+		if (keepconnection) {
+			// Send our username to the server this is the only message that we
+			// will send as a String. All other messages will be ChatMessage objects
+			try {
+				sOutput.writeObject(publicKey);
+
+				byte[] decryptedKey = util.decrypt("RSA/ECB/PKCS1Padding", privateKey, (byte[]) sInput.readObject(), null);
+				AESKey = new SecretKeySpec(decryptedKey, "AES");
+
+				username = URLEncoder.encode(username, "UTF-8");
+				password = URLEncoder.encode(password, "UTF-8");
+				String message = username + ":" + password;
+
+				String msg;
+				if (confirmpassword != null) {
+					confirmpassword = URLEncoder.encode(confirmpassword, "UTF-8");
+					message += ":" + confirmpassword;
+
+					sendMessage(ChatMessage.REGISTER, message);
+					ChatMessage chatMessage = (ChatMessage) sInput.readObject();
+					switch (chatMessage.getType()) {
+						case ChatMessage.SUCCESS: {
+							msg = "Registration Successful";
+							if (cg != null) {
+								JOptionPane.showMessageDialog(cg, msg, cg.getTitle(), JOptionPane.INFORMATION_MESSAGE);
+								cg.mainDialog();
+							} else {
+								display("Registration Successful");
+							}
+
+							break;
+						}
+
+						case ChatMessage.FAIL: {
+							msg = "Registration Fail. Username already exists / contains whitespaces or passwords do not match.";
+							if (cg != null) {
+								JOptionPane.showMessageDialog(cg, msg, cg.getTitle(), JOptionPane.ERROR_MESSAGE);
+							} else {
+								display("Registration Successful");
+							}
+
+							break;
+						}
+					}
+				} else {
+					sendMessage(ChatMessage.LOGIN, message);
+
+					ChatMessage chatMessage = (ChatMessage) sInput.readObject();
+					switch (chatMessage.getType()) {
+						case ChatMessage.SUCCESS: {
+							msg = "Connection accepted " + socket.getInetAddress() + ":" + socket.getPort();
+
+							if (cg != null) {
+								cg.setClient(this);
+								cg.setVisible(false);
+								cg.chatDialog();
+							}
+
+							display(msg);
+
+							// creates the Thread to listen from the server
+							new ListenFromServer(AESKey).start();
+
+							break;
+						}
+
+						case ChatMessage.FAIL: {
+							msg = "Login Fail";
+							if (cg != null) {
+								JOptionPane.showMessageDialog(cg, msg, cg.getTitle(), JOptionPane.ERROR_MESSAGE);
+							} else {
+								display(msg);
+							}
+
+							break;
+						}
+					}
+				}
+			} catch (Exception e) {
+				//display("Exception doing login : " + e);
+				disconnect();
+				return false;
+			}
+		} else {
 			disconnect();
-			return false;
 		}
 		
 		// success we inform the caller that it worked
@@ -200,7 +228,7 @@ public class Client  {
 				chatMessage.setMessage(cipherText);
 
 				byte[] salt = Hash.getSalt();
-				byte[] hash = Hash.hash(messageBytes, salt);
+				byte[] hash = Hash.hash(message, salt);
 				byte[] digitalSignature = util.encrypt("RSA/ECB/PKCS1Padding",privateKey,hash,null);
 				chatMessage.setDigitalSignature(digitalSignature);
 				chatMessage.setSalt(salt);
@@ -218,19 +246,25 @@ public class Client  {
 	 */
 	private void disconnect() {
 		try {
-			if(sInput != null) sInput.close();
+			if (sInput != null) {
+				sInput.close();
+			}
 		} catch (Exception e) {
 
 		} // not much else I can do
 
 		try {
-			if(sOutput != null) sOutput.close();
+			if (sOutput != null) {
+				sOutput.close();
+			}
 		} catch (Exception e) {
 
 		} // not much else I can do
 
         try{
-			if(socket != null) socket.close();
+			if (socket != null) {
+				socket.close();
+			}
 		} catch (Exception e) {
 
 		} // not much else I can do
@@ -392,11 +426,42 @@ public class Client  {
 			byte[] messageBytes = util.decrypt("AES/CBC/PKCS5Padding",AESKey,encryptedMessage,IV);
 			byte[] hash = util.decrypt("RSA/ECB/PKCS1Padding",publicKeyServer,digitalSignature,null);
 
-			if (Arrays.equals(hash, Hash.hash(messageBytes, salt))) {
-				message = util.bytesToString(messageBytes);
+			message = util.bytesToString(messageBytes);
+			if (!Arrays.equals(hash, Hash.hash(message, salt))) {
+				message = null;
 			}
 
 			return message;
 		}
+	}
+
+	private boolean verifyCertificate(Certificate certificate) {
+		boolean verify = false;
+
+		try {
+			FileInputStream fileInputStream = new FileInputStream(TRUSTSTOREFILE);
+			KeyStore keystore = KeyStore.getInstance("JKS");
+			keystore.load(fileInputStream,TRUSTSTOREPASSWORD.toCharArray());
+			fileInputStream.close();
+
+			String issuerDN = ((X509Certificate) certificate).getIssuerDN().getName();
+
+			Enumeration enumeration = keystore.aliases();
+			while (enumeration.hasMoreElements()) {
+				String alias = (String) enumeration.nextElement();
+				if (keystore.isCertificateEntry(alias)) {
+					X509Certificate x509Certificate = (X509Certificate) keystore.getCertificate(alias);
+					if (x509Certificate.getIssuerDN().getName().equals(issuerDN)) {
+						certificate.verify(x509Certificate.getPublicKey());
+						verify = true;
+						break;
+					}
+				}
+			}
+		} catch (Exception e) {
+			//e.printStackTrace();
+		}
+
+		return verify;
 	}
 }

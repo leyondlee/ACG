@@ -15,7 +15,7 @@ public class util {
 			keyPairGenerator.initialize(2048);
 			keypair = keyPairGenerator.genKeyPair();
 		} catch (Exception e) {
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		
 		return keypair;
@@ -29,7 +29,7 @@ public class util {
 			keyGenerator.init(256);
 			key = keyGenerator.generateKey();
 		} catch (Exception e) {
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		
 		return key;
@@ -40,7 +40,7 @@ public class util {
 		try {
 			s = new String(b, StandardCharsets.UTF_8);
 		} catch (Exception e) {
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		
 		return s;
@@ -51,7 +51,7 @@ public class util {
 		try {
 			b = s.getBytes(StandardCharsets.UTF_8);
 		} catch (Exception e) {
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		
 		return b;
@@ -65,7 +65,7 @@ public class util {
 			cipher.init(Cipher.DECRYPT_MODE,key,params);
 			cipherText = cipher.doFinal(message);
 		} catch (Exception e) {
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 
 		return cipherText;
@@ -79,7 +79,7 @@ public class util {
 			cipher.init(Cipher.ENCRYPT_MODE,key,params);
 			cipherText = cipher.doFinal(message);
 		} catch (Exception e) {
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 
 		return cipherText;

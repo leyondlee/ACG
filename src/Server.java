@@ -6,13 +6,17 @@ import java.security.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.crypto.*;
 import javax.crypto.spec.*;
+import java.security.cert.Certificate;
 
 /*
  * The server that can be run both as a console application or a GUI
  */
 public class Server {
+	private static final String KEYSTOREFILENAME = "keystore";
+	private static final String KEYSTOREPASSWORD = "password";
+	private static final String CERTALIAS = "chatserver_signed";
+
 	// a unique ID for each connection
 	private static int uniqueId;
 	// an ArrayList to keep the list of the Client
@@ -53,9 +57,9 @@ public class Server {
 	public void start() {
 		keepGoing = true;
 		
-		KeyPair keypair = util.generateRSAKeys();
-		this.privateKey = keypair.getPrivate();
+		KeyPair keypair = getKeyPair();
 		this.publicKey = keypair.getPublic();
+		this.privateKey = keypair.getPrivate();
 
 		refreshUserList();
 
@@ -244,9 +248,10 @@ public class Server {
 				// create output first
 				sOutput = new ObjectOutputStream(socket.getOutputStream());
 				sInput  = new ObjectInputStream(socket.getInputStream());
-				
-				sOutput.writeObject(this.publicKeyServer.getEncoded());
-				
+
+				Certificate certificate = getCertificate();
+				sOutput.writeObject(certificate);
+
 				publicKey = (PublicKey) sInput.readObject();
 				sOutput.writeObject(util.encrypt("RSA/ECB/PKCS1Padding",publicKey,AESKey.getEncoded(),null));
 
@@ -263,14 +268,14 @@ public class Server {
 								boolean success = false;
 
 								String value = users.get(username);
-								if (value != null) {
+								if (value != null && findClientThread(username) == null) {
 									Pattern pattern = Pattern.compile("^\\$(.*)\\$(.*)$");
 									Matcher matcher = pattern.matcher(value);
 
 									if (matcher.find()) {
 										byte[] salt = util.hexToBytes(matcher.group(1));
 										byte[] passwordhash = util.hexToBytes(matcher.group(2));
-										if (Arrays.equals(Hash.hash(util.stringToBytes(password), salt), passwordhash)) {
+										if (Arrays.equals(Hash.hash(password, salt), passwordhash)) {
 											keepGoing = true;
 											display(username + " just connected.");
 											success = true;
@@ -290,9 +295,9 @@ public class Server {
 							case ChatMessage.REGISTER: {
 								String confirmpassword = URLDecoder.decode(parts[2], "UTF-8");
 
-								if (!username.contains(" ") && password.equals(confirmpassword) && users.get(username) == null) {
+								if (!username.equals("") && !password.equals("") && !username.contains(" ") && password.equals(confirmpassword) && users.get(username) == null) {
 									byte[] salt = Hash.getSalt();
-									byte[] hash = Hash.hash(util.stringToBytes(password), salt);
+									byte[] hash = Hash.hash(password, salt);
 
 									String entry = username + ":$" + util.bytesToHex(salt) + "$" + util.bytesToHex(hash);
 									addUser(entry);
@@ -341,7 +346,7 @@ public class Server {
 				switch (cm.getType()) {
 					case ChatMessage.MESSAGE: {
 						if (message != null) {
-							Pattern pattern = Pattern.compile("^\\@(\\S+)\\s(.*)");
+							Pattern pattern = Pattern.compile("^@(\\S+)\\s(.*)$");
 							Matcher matcher = pattern.matcher(message);
 							if (matcher.find()) {
 								String user = matcher.group(1);
@@ -431,7 +436,7 @@ public class Server {
 					byte[] messageBytes = util.stringToBytes(msg);
 
 					byte[] salt = Hash.getSalt();
-					byte[] hash = Hash.hash(messageBytes, salt);
+					byte[] hash = Hash.hash(msg, salt);
 					byte[] digitalSignature = util.encrypt("RSA/ECB/PKCS1Padding", privateKey, hash, null);
 
 					IvParameterSpec IV = util.generateIV();
@@ -466,11 +471,11 @@ public class Server {
 					IvParameterSpec IV = new IvParameterSpec(util.decryptIV(encryptedIV,privateKey));
 					byte[] decryptedText = util.decrypt("AES/CBC/PKCS5Padding",AESKey,messageBytes,IV);
 
-					if (Arrays.equals(hash, Hash.hash(decryptedText, salt))) {
+					if (Arrays.equals(hash, Hash.hash(util.bytesToString(decryptedText), salt))) {
 						message = util.bytesToString(decryptedText);
 					}
 				} catch (Exception e) {
-					e.printStackTrace();
+					//e.printStackTrace();
 				}
 			}
 
@@ -549,5 +554,51 @@ public class Server {
 		}
 
 		return clientThread;
+	}
+
+	private KeyStore getKeyStore() {
+		KeyStore keyStore = null;
+		try {
+			FileInputStream fileInputStream = new FileInputStream(KEYSTOREFILENAME);
+			keyStore = KeyStore.getInstance("JKS");
+			keyStore.load(fileInputStream, KEYSTOREPASSWORD.toCharArray());
+			fileInputStream.close();
+		} catch (Exception e) {
+			//e.printStackTrace();
+		}
+
+		return keyStore;
+	}
+
+	private Certificate getCertificate() {
+		Certificate certificate = null;
+
+		try {
+			KeyStore keyStore = getKeyStore();
+			if (keyStore != null) {
+				certificate = keyStore.getCertificate(CERTALIAS);
+			}
+		} catch (Exception e) {
+			//e.printStackTrace();
+		}
+
+		return certificate;
+	}
+
+	private KeyPair getKeyPair() {
+		KeyPair keyPair = null;
+
+		KeyStore keyStore = getKeyStore();
+		if (keyStore != null) {
+			try {
+				PublicKey publicKey = getCertificate().getPublicKey();
+				PrivateKey privateKey = (PrivateKey) keyStore.getKey(CERTALIAS, KEYSTOREPASSWORD.toCharArray());
+				keyPair = new KeyPair(publicKey,privateKey);
+			} catch (Exception e) {
+				//e.printStackTrace();
+			}
+		}
+
+		return keyPair;
 	}
 }
