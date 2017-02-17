@@ -249,12 +249,15 @@ public class Server {
 				sOutput = new ObjectOutputStream(socket.getOutputStream());
 				sInput  = new ObjectInputStream(socket.getInputStream());
 
+				// Get certificate from KeyStore and send to client
 				Certificate certificate = getCertificate();
 				sOutput.writeObject(certificate);
 
+				// Read client public key and encrypt AES key with it
 				publicKey = (PublicKey) sInput.readObject();
 				sOutput.writeObject(Util.encrypt("RSA/ECB/PKCS1Padding",publicKey,AESKey.getEncoded(),null));
 
+				// Initial authentication, client sends credentials
 				ChatMessage chatMessage = (ChatMessage) sInput.readObject();
 				String message = getMessage(chatMessage);
 				if (message != null) {
@@ -267,9 +270,9 @@ public class Server {
 							case ChatMessage.LOGIN: {
 								boolean success = false;
 
-								String value = users.get(username);
-								if (value != null && findClientThread(username) == null) {
-									Pattern pattern = Pattern.compile("^\\$(.*)\\$(.*)$");
+								String value = users.get(username); // If username exists will return string else null
+								if (value != null && findClientThread(username) == null) { // Make sure username exists and not logged in currently
+									Pattern pattern = Pattern.compile("^\\$(.*)\\$(.*)$"); //Regex to get salt
 									Matcher matcher = pattern.matcher(value);
 
 									if (matcher.find()) {
@@ -295,13 +298,13 @@ public class Server {
 							case ChatMessage.REGISTER: {
 								String confirmpassword = URLDecoder.decode(parts[2], "UTF-8");
 
-								if (!username.equals("") && !password.equals("") && !username.contains(" ") && password.equals(confirmpassword) && users.get(username) == null) {
+								if (!username.equals("") && !password.equals("") && !username.contains(" ") && password.equals(confirmpassword) && users.get(username) == null) { // Do all checks and make sure username does not exists in database
 									byte[] salt = Hash.getSalt();
 									byte[] hash = Hash.hash(password, salt);
 
-									String entry = username + ":$" + Util.bytesToHex(salt) + "$" + Util.bytesToHex(hash);
+									String entry = username + ":$" + Util.bytesToHex(salt) + "$" + Util.bytesToHex(hash); // Store similar to shadow file format
 									addUser(entry);
-									refreshUserList();
+									refreshUserList(); // Refresh user HashMap list
 
 									writeMsg(ChatMessage.SUCCESS, null);
 								} else {
@@ -346,14 +349,14 @@ public class Server {
 				switch (cm.getType()) {
 					case ChatMessage.MESSAGE: {
 						if (message != null) {
-							Pattern pattern = Pattern.compile("^@(\\S+)\\s(.*)$");
+							Pattern pattern = Pattern.compile("^@(\\S+)\\s(.*)$"); // Regex to see if message is a Private Message
 							Matcher matcher = pattern.matcher(message);
 							if (matcher.find()) {
 								String user = matcher.group(1);
 								message = matcher.group(2);
-								if (!username.equals(user)) {
+								if (!username.equals(user)) { // Check if trying to pm itself
 									ClientThread receiverCT = findClientThread(user);
-									if (receiverCT != null) {
+									if (receiverCT != null) { // Check if receiver is online
 										privateMessage(this, receiverCT, message);
 									} else {
 										writeMsg(ChatMessage.NONE,"User " + user + " is not online.\n");
@@ -435,10 +438,12 @@ public class Server {
 				if (msg != null) {
 					byte[] messageBytes = Util.stringToBytes(msg);
 
+					// Create Digital Signature
 					byte[] salt = Hash.getSalt();
 					byte[] hash = Hash.hash(msg, salt);
 					byte[] digitalSignature = Util.encrypt("RSA/ECB/PKCS1Padding", privateKey, hash, null);
 
+					// Encrypt message with random IV
 					IvParameterSpec IV = Util.generateIV();
 					byte[] encryptedIV = Util.encryptIV(IV.getIV(), publicKey);
 					byte[] encryptedMessage = Util.encrypt("AES/CBC/PKCS5Padding", AESKey, messageBytes, IV);
@@ -459,6 +464,10 @@ public class Server {
 			return true;
 		}
 
+		/*
+			Decrypt and verify that message is from sending client
+			If check fail will return null, else will return decrypted message
+		 */
 		private String getMessage(ChatMessage chatMessage) {
 			String message = null;
 			byte[] messageBytes = chatMessage.getMessage();
@@ -483,6 +492,7 @@ public class Server {
 		}
 	}
 
+	// Add new user to "database" aka a file (users.txt)
 	private void addUser(String entry) {
 		try {
 			BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter("users.txt", true));
@@ -494,6 +504,7 @@ public class Server {
 		}
 	}
 
+	// Get all users from file and store them in HashMap key: <username>, value: $<salt>$<hashed password>
 	private HashMap<String,String> getUsers() {
 		HashMap<String,String> users = new HashMap<>();
 
@@ -520,6 +531,9 @@ public class Server {
 		users = getUsers();
 	}
 
+	/*
+		Handle Private Message
+	 */
 	private synchronized void privateMessage(ClientThread senderCT, ClientThread receiverCT, String message) {
 		String sender = senderCT.username;
 		String receiver = receiverCT.username;
@@ -541,6 +555,9 @@ public class Server {
 		senderCT.writeMsg(ChatMessage.NONE, messageLf);
 	}
 
+	/*
+		Will return ClientThread object if username is online, else null
+	 */
 	private ClientThread findClientThread(String username) {
 		ClientThread clientThread = null;
 
@@ -556,6 +573,9 @@ public class Server {
 		return clientThread;
 	}
 
+	/*
+		Load and return KeyStore. Will return null if fail
+	 */
 	private KeyStore getKeyStore() {
 		KeyStore keyStore = null;
 		try {
@@ -570,6 +590,9 @@ public class Server {
 		return keyStore;
 	}
 
+	/*
+		Get certificate from KeyStore
+	 */
 	private Certificate getCertificate() {
 		Certificate certificate = null;
 
@@ -585,6 +608,9 @@ public class Server {
 		return certificate;
 	}
 
+	/*
+		Get Private and Public keys from KeyStore
+	 */
 	private KeyPair getKeyPair() {
 		KeyPair keyPair = null;
 

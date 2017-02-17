@@ -80,9 +80,12 @@ public class Client  {
 			sInput  = new ObjectInputStream(socket.getInputStream());
 			sOutput = new ObjectOutputStream(socket.getOutputStream());
 
+			// Get certificate from server
 			Certificate certificate = (Certificate) sInput.readObject();
 			PublicKey publicKey = certificate.getPublicKey();
 			this.publicKeyServer = publicKey;
+
+			// Check if certificate is trusted
 			verified = verifyCertificate(certificate);
 		} catch (Exception e) {
 			display("Exception creating new Input/output Streams: " + e);
@@ -90,7 +93,7 @@ public class Client  {
 		}
 
 		boolean keepconnection = true;
-		if (!verified) {
+		if (!verified) { // Certificate is not trusted, prompt if user wants to continue
 			String msg = "Certificate is not trusted. your session may not be secure. Do you wish to continue?";
 			if (cg != null) {
 				String options[] = {"Yes","No (Recommended)"};
@@ -112,11 +115,14 @@ public class Client  {
 			// Send our username to the server this is the only message that we
 			// will send as a String. All other messages will be ChatMessage objects
 			try {
+				// Send public key to server
 				sOutput.writeObject(publicKey);
 
+				// Decrypt AES key
 				byte[] decryptedKey = Util.decrypt("RSA/ECB/PKCS1Padding", privateKey, (byte[]) sInput.readObject(), null);
 				AESKey = new SecretKeySpec(decryptedKey, "AES");
 
+				// Encode username and password in case of special characters
 				username = URLEncoder.encode(username, "UTF-8");
 				password = URLEncoder.encode(password, "UTF-8");
 				String message = username + ":" + password;
@@ -220,13 +226,16 @@ public class Client  {
 			if (message != null) {
 				byte[] messageBytes = Util.stringToBytes(message);
 
+				// Generate random IV and encrypt it with server's public key
 				IvParameterSpec IV = Util.generateIV();
 				byte[] encryptedIV = Util.encryptIV(IV.getIV(),publicKeyServer);
 				chatMessage.setEncryptedIV(encryptedIV);
 
+				// Encrypt message with AES
 				byte[] cipherText = Util.encrypt("AES/CBC/PKCS5Padding",AESKey,messageBytes,IV);
 				chatMessage.setMessage(cipherText);
 
+				// Digital signature
 				byte[] salt = Hash.getSalt();
 				byte[] hash = Hash.hash(message, salt);
 				byte[] digitalSignature = Util.encrypt("RSA/ECB/PKCS1Padding",privateKey,hash,null);
@@ -384,7 +393,7 @@ public class Client  {
 							break;
 						}
 
-						default: {
+						default: { // Normal message
 							String message = getMessage(chatMessage);
 
 							if (message != null) {
@@ -414,6 +423,10 @@ public class Client  {
 			}
 		}
 
+		/*
+			Get message from chatMessage object. Will check if from server (Digital Signature).
+			If not from server, will return null
+		 */
 		private String getMessage(ChatMessage chatMessage) {
 			String message = null;
 
@@ -435,15 +448,21 @@ public class Client  {
 		}
 	}
 
+	/*
+		Check if certificate is trusted.
+		Tries to find signer in TrustStore
+	 */
 	private boolean verifyCertificate(Certificate certificate) {
 		boolean verify = false;
 
 		try {
+			// Load TrustStore
 			FileInputStream fileInputStream = new FileInputStream(TRUSTSTOREFILE);
 			KeyStore keystore = KeyStore.getInstance("JKS");
 			keystore.load(fileInputStream,TRUSTSTOREPASSWORD.toCharArray());
 			fileInputStream.close();
 
+			//Get signer
 			String issuerDN = ((X509Certificate) certificate).getIssuerDN().getName();
 
 			Enumeration enumeration = keystore.aliases();
@@ -452,7 +471,7 @@ public class Client  {
 				if (keystore.isCertificateEntry(alias)) {
 					X509Certificate x509Certificate = (X509Certificate) keystore.getCertificate(alias);
 					if (x509Certificate.getIssuerDN().getName().equals(issuerDN)) {
-						certificate.verify(x509Certificate.getPublicKey());
+						certificate.verify(x509Certificate.getPublicKey()); // Will throw exception if fail
 						verify = true;
 						break;
 					}
